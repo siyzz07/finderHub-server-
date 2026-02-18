@@ -3,10 +3,9 @@ import User from '../models/User.js';
 
 export const getItems = async (req, res) => {
     try {
-        const { search, category, type, isApproved, lat, lng, radius = 5000 } = req.query; // Default radius 5km
-        let query = {};
+        const { search, category, type, isApproved, lat, lng, radius = 5000 } = req.query; 
 
-        // By default, only show approved items
+        
         if (isApproved !== undefined) {
             query.isApproved = isApproved === 'true';
         } else {
@@ -29,7 +28,7 @@ export const getItems = async (req, res) => {
             query.type = type;
         }
 
-        // Geospatial Query
+        
         if (lat && lng) {
             query.location_point = {
                 $near: {
@@ -43,7 +42,7 @@ export const getItems = async (req, res) => {
         }
 
         const items = await Item.find(query)
-            .sort(lat && lng ? {} : { createdAt: -1 }) // $near already sorts by proximity
+            .sort(lat && lng ? {} : { createdAt: -1 }) 
             .populate('poster', 'username');
         res.json(items);
     } catch (error) {
@@ -86,7 +85,7 @@ export const createItem = async (req, res) => {
                 coordinates: [parseFloat(lng), parseFloat(lat)]
             },
             poster: req.user.id,
-            isApproved: false // Ensure new items are always pending
+            isApproved: false 
         });
         await item.save();
         res.status(201).json(item);
