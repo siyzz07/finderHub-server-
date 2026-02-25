@@ -1,5 +1,8 @@
 import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const generateAccessToken = (user) => {
     return jwt.sign(
@@ -74,6 +77,53 @@ export const login = async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
+    }
+};
+
+export const googleLogin = async (req, res) => {
+    try {
+        const { token } = req.body;
+        const ticket = await client.verifyIdToken({
+            idToken: token,
+            audience: process.env.GOOGLE_CLIENT_ID
+        });
+
+        const { name, email, sub: googleId } = ticket.getPayload();
+
+        let user = await User.findOne({ 
+            $or: [{ googleId }, { email }] 
+        });
+
+        if (!user) {
+            // Create a new user if not exists
+            user = new User({
+                username: name.replace(/\s+/g, '').toLowerCase() + Math.floor(Math.random() * 1000),
+                email,
+                googleId,
+                // Password is not required for Google users
+            });
+            await user.save();
+        } else if (!user.googleId) {
+            // Link google account to existing email account
+            user.googleId = googleId;
+            await user.save();
+        }
+
+        const accessToken = generateAccessToken(user);
+        const refreshToken = generateRefreshToken(user);
+
+        user.refreshToken = refreshToken;
+        await user.save();
+
+        res.json({
+            message: 'Google Login successful',
+            accessToken,
+            refreshToken,
+            user: { id: user._id, username: user.username, email: user.email, role: user.role }
+        });
+    } catch (error) {
+        console.error('Google Login Error:', error);
+        res.status(400).json({ message: 'Google Authentication failed' });
     }
 };
 
